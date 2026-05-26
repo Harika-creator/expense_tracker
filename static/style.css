@@ -1,28 +1,7 @@
 body {
-    font-family: Arial;
-    margin: 40px;
+    font-family: Arial, sans-serif;
 }
 
-h1 {
-    color: #333;
-}
-
-form input {
-    padding: 10px;
-    margin: 5px;
-}
-
-button {
-    padding: 10px 20px;
-}
-
-table {
-    width: 100%;
-    margin-top: 20px;
-    border-collapse: collapse;
-}
-
-th, td {
-    padding: 10px;
-    text-align: center;
+.card {
+    border-radius: 15px;
 }
