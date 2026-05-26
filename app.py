@@ -2,31 +2,15 @@ from flask import Flask, render_template, request, redirect, session
 import sqlite3
 
 app = Flask(__name__)
+app.secret_key = "expense_secret"
 
-app.secret_key = 'secret123'
-
-
-# ---------------- DATABASE ---------------- #
-
+# DATABASE
 def init_db():
 
     conn = sqlite3.connect('expenses.db')
-
     cursor = conn.cursor()
 
-    # Expense Table
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS expenses (
-
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        amount REAL,
-        category TEXT,
-        description TEXT
-
-    )
-    ''')
-
-    # Users Table
+    # USERS TABLE
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS users (
 
@@ -37,15 +21,25 @@ def init_db():
     )
     ''')
 
+    # EXPENSES TABLE
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS expenses (
+
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        amount REAL,
+        category TEXT,
+        description TEXT
+
+    )
+    ''')
+
     conn.commit()
     conn.close()
 
-
 init_db()
 
-
-# ---------------- REGISTER ---------------- #
-
+# REGISTER
 @app.route('/register', methods=['GET', 'POST'])
 def register():
 
@@ -55,7 +49,6 @@ def register():
         password = request.form['password']
 
         conn = sqlite3.connect('expenses.db')
-
         cursor = conn.cursor()
 
         cursor.execute(
@@ -70,9 +63,7 @@ def register():
 
     return render_template('register.html')
 
-
-# ---------------- LOGIN ---------------- #
-
+# LOGIN
 @app.route('/login', methods=['GET', 'POST'])
 def login():
 
@@ -82,7 +73,6 @@ def login():
         password = request.form['password']
 
         conn = sqlite3.connect('expenses.db')
-
         cursor = conn.cursor()
 
         cursor.execute(
@@ -96,47 +86,59 @@ def login():
 
         if user:
 
-            session['user'] = username
-
+            session['user_id'] = user[0]
             return redirect('/')
 
     return render_template('login.html')
 
-
-# ---------------- LOGOUT ---------------- #
-
+# LOGOUT
 @app.route('/logout')
 def logout():
 
-    session.pop('user', None)
-
+    session.clear()
     return redirect('/login')
 
-
-# ---------------- HOME PAGE ---------------- #
-
-@app.route('/')
+# HOME
+@app.route('/', methods=['GET', 'POST'])
 def index():
 
-    if 'user' not in session:
+    if 'user_id' not in session:
         return redirect('/login')
 
     conn = sqlite3.connect('expenses.db')
-
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM expenses")
+    # ADD EXPENSE
+    if request.method == 'POST':
+
+        amount = request.form['amount']
+        category = request.form['category']
+        description = request.form['description']
+
+        cursor.execute(
+            "INSERT INTO expenses (user_id, amount, category, description) VALUES (?, ?, ?, ?)",
+            (session['user_id'], amount, category, description)
+        )
+
+        conn.commit()
+
+    # SHOW USER EXPENSES
+    cursor.execute(
+        "SELECT * FROM expenses WHERE user_id=?",
+        (session['user_id'],)
+    )
 
     expenses = cursor.fetchall()
 
-    cursor.execute("SELECT SUM(amount) FROM expenses")
+    # TOTAL
+    cursor.execute(
+        "SELECT SUM(amount) FROM expenses WHERE user_id=?",
+        (session['user_id'],)
+    )
 
     total = cursor.fetchone()[0]
 
     conn.close()
-
-    if total is None:
-        total = 0
 
     return render_template(
         'index.html',
@@ -144,53 +146,5 @@ def index():
         total=total
     )
 
-
-# ---------------- ADD EXPENSE ---------------- #
-
-@app.route('/add', methods=['POST'])
-def add_expense():
-
-    amount = request.form['amount']
-    category = request.form['category']
-    description = request.form['description']
-
-    conn = sqlite3.connect('expenses.db')
-
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "INSERT INTO expenses (amount, category, description) VALUES (?, ?, ?)",
-        (amount, category, description)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return redirect('/')
-
-
-# ---------------- DELETE EXPENSE ---------------- #
-
-@app.route('/delete/<int:id>')
-def delete_expense(id):
-
-    conn = sqlite3.connect('expenses.db')
-
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "DELETE FROM expenses WHERE id=?",
-        (id,)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return redirect('/')
-
-
-# ---------------- RUN APP ---------------- #
-
 if __name__ == '__main__':
-
     app.run(host='0.0.0.0', port=5000)
